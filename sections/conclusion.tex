@@ -1,0 +1,7 @@
+\Needspace{11\baselineskip}
+\section{Conclusion}
+\label{sec:conclusion}
+
+RecDataAgent formulates recommendation data augmentation as complete user-conditioned policy construction. A language-model controller analyzes train-visible user and item context, selects users, assigns typed data-construction methods, and allocates their exposure under a fixed budget. Typed execution and an evidence archive then connect the proposed policy to realized records, downstream recommendation outcomes, and subsequent policy revision.
+
+Across Amazon Beauty, Toys, and Sports, the validation-selected complete policies achieve the strongest local performance on the four core Recall/NDCG metrics at @10 and @20. Matched routing controls demonstrate the value of contextual allocation, and the first-round feedback ablation characterizes how validation outcomes influence policy construction. The multi-round analysis connects successive policy decisions with their resulting recommendation performance. Together, these results establish a practical framework for complete-policy construction and revision through validation-guided search.

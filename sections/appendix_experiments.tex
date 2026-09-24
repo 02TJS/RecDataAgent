@@ -1,0 +1,393 @@
+\section{Experimental Details}
+\label{app:experiments}
+
+This appendix expands the evaluation setup and intervention evidence in Sections~\ref{sec:exp-setup}--\ref{sec:archive-analysis}. It consolidates the protocol, the first-round feedback comparison, a feature-guided case analysis, and a self-contained planner specification.
+
+\subsection{Protocol and Evidence}
+
+\paragraph{Evaluation protocol.}
+The evaluation uses Amazon Beauty, Toys, and Sports sequential recommendation. Each example provides a preceding item sequence and predicts the next item's five characteristic words. The fixed populations contain 22,363 Beauty users, 19,412 Toys users, and 35,598 Sports users. The principal comparisons use Qwen3-4B-Instruct-2507 with one epoch of full-parameter BF16 training, cutoff length 2,048, cosine decay from $10^{-4}$, and effective global batch size 80. DeepSpeed ZeRO-3 is used for training; hardware-dependent micro-batches vary while the effective global batch remains fixed. The five training seeds are $\{40,41,42,43,44\}$ and the reference data seed is 42.
+The controlled comparison treats all baseline methods included in Table~\ref{tab:overall} as method-level comparators. Each baseline retains its method-specific construction and recommendation objective, while the shared recommendation setting and one-epoch training horizon keep the downstream task fixed, allowing the experiments to focus on user-conditioned data-policy construction and feedback-guided revision.
+
+For the reported local results, deterministic decoding uses batch size 1, 20 beams, 20 returned sequences, and at most 30 new tokens. All reported local tables and comparisons are restricted to this fixed 20-beam evaluation protocol. Formal results cover six disjoint evaluation shards and are released only after aggregate identity, protocol, and completeness checks pass. Training data provide the base corpus, augmentation inputs, and user features; validation outcomes supply all feedback for proposal revision, candidate ranking, incumbent updates, and final policy selection. Local result tables report metrics after policies and comparison conditions are fixed, while published comparator rows retain their source protocols. Policy-to-run linkage has been checked against the planner prompt, generated policy, materialized corpus, completed training record, and evaluation summary.
+
+\paragraph{Main-table aggregation.}
+For each domain, every metric in the locally evaluated rows of Table~\ref{tab:overall}---L2Aug, GenPAS, AsarRec, and \method{}---is the arithmetic mean across the five training seeds $\{40,41,42,43,44\}$. Published comparator rows retain the reporting conventions of their source studies.
+
+\paragraph{Search budget and stopping rule.}
+For each domain, policy search runs for three rounds with three candidate policies per round, yielding nine candidates in total. We use a fixed three-round stopping rule: search terminates after completing Round~3. The final policy is selected by validation utility from the completed candidates within this budget. The reference row in Table~\ref{tab:three-rounds} reuses the final selected policy from this search.
+Here validation utility is validation Recall@10 from the fixed seed-42 reference run, computed as the user-count-weighted micro-average over complete validation shards. The five-seed arithmetic means in the main table are reporting aggregates for policies fixed before that evaluation, not an additional selection stage. This rule is fixed before candidate generation and is independent of the candidate's declared hypothesis metric; an exact tie is resolved by earlier round and then lower candidate index. Test and Full-evaluation outcomes are not used for candidate ranking or final policy selection.
+
+\paragraph{Round-level selection trace.}
+To make the link between search-time selection and the reported round profiles explicit, Table~\ref{tab:round-selection-trace} places the fixed validation utility beside the corresponding Test Recall@10 already reported in Table~\ref{tab:three-rounds}. The validation utility is the seed-42 validation Recall@10 defined above; Test Recall@10 is shown only for audit and does not enter selection. The \textsc{Ref.} row is the final policy selected from the complete nine-candidate archive, not a fourth round. Because Table~\ref{tab:three-rounds} shows one representative policy per round, the reference may come from any of the other six candidates.
+
+\begin{table}[H]
+\centering
+\caption{Round-level selection trace. Validation utility is seed-42 validation Recall@10; the Test Recall@10 entries are copied from Table~\ref{tab:three-rounds} for audit and do not enter selection.}
+\label{tab:round-selection-trace}
+\small
+\renewcommand{\arraystretch}{1.05}
+\setlength{\tabcolsep}{4.5pt}
+\begin{tabular}{llrrl}
+\hline
+Domain & Entry & Validation R@10 & Test R@10 & Selection role \\
+\hline
+\multirow[c]{4}{*}{Beauty}
+ & Round~1 & 0.087326 & 0.0791 & Displayed round \\
+ & Round~2 & 0.074418 & 0.0679 & Displayed round \\
+ & Round~3 & 0.086756 & 0.0783 & Displayed round \\
+ & \textsc{Ref.} & \textbf{0.088000} & \textbf{0.0800} & Final selected \\
+\hline
+\multirow[c]{4}{*}{Toys}
+ & Round~1 & 0.082465 & 0.0749 & Displayed round \\
+ & Round~2 & 0.079533 & 0.0725 & Displayed round \\
+ & Round~3 & 0.076854 & 0.0693 & Displayed round \\
+ & \textsc{Ref.} & \textbf{0.091080} & \textbf{0.0828} & Final selected \\
+\hline
+\multirow[c]{4}{*}{Sports}
+ & Round~1 & 0.054461 & 0.0496 & Displayed round \\
+ & Round~2 & 0.054378 & 0.0493 & Displayed round \\
+ & Round~3 & 0.052345 & 0.0472 & Displayed round \\
+ & \textsc{Ref.} & \textbf{0.062590} & \textbf{0.0569} & Final selected \\
+\hline
+\end{tabular}
+\end{table}
+
+\paragraph{Worked provenance example: Beauty.}
+The Beauty archive used for this worked example contains three sequential evaluated policies, namely Round~1 (\texttt{research-1}), Round~2 (\texttt{research-2}), and Round~3 (\texttt{research-3}). Table~\ref{tab:three-rounds} is a compact cross-domain trace, whereas Table~\ref{tab:beauty-candidate-ledger} gives the complete displayed Beauty round-policy ledger; the two tables therefore serve different reporting purposes. The final reference policy is reported separately as \textsc{Ref.} because it is the selected policy used in the main comparison, rather than a fourth round. Validation feedback was used to form later proposals, whereas the ledger reports formal Full-evaluation outcomes under deterministic 20-beam decoding, not validation utility values.
+
+\begin{table}[H]
+\centering
+\caption{Beauty round-policy ledger for the worked provenance example. Each displayed row is one completed policy; the metrics are formal Full-evaluation results, not validation utility values. The bold row is the final reference policy used in the main comparison.}
+\label{tab:beauty-candidate-ledger}
+\scriptsize
+\setlength{\tabcolsep}{2.8pt}
+\begin{tabular}{llrrrrl}
+\hline
+Round & Candidate & R@10 & N@10 & R@20 & N@20 & Role \\
+\hline
+1 & \texttt{research-1} & 0.0791 & 0.0459 & 0.1066 & 0.0528 & \\
+2 & \texttt{research-2} & 0.0679 & 0.0369 & 0.0954 & 0.0439 & \\
+3 & \texttt{research-3} & 0.0783 & 0.0464 & 0.1075 & 0.0538 & \\
+ \textsc{Ref.} & \texttt{main-reference} & \textbf{0.0800} & \textbf{0.0463} & \textbf{0.1087} & \textbf{0.0535} & \textbf{Final Ref.} \\
+\hline
+\end{tabular}
+\end{table}
+
+\paragraph{Candidate corpus budget.}
+Each candidate retains one complete copy of the base corpus. The principal configurations append 22,363, 19,412, and 35,572 records in Beauty, Toys, and Sports, respectively, as summarized in Table~\ref{tab:data-stats}; the same domain-specific budgets are used in the matched feedback comparison. Every eligible user contributes at most one appended record, and the 26 unsupported Sports users remain base-only. These settings preserve the exact base-record prefix and fixed method applicability across local comparisons.
+
+\paragraph{Evidence organization.}
+The archive selects and compares complete corpus policies using validation utility. The appendix organizes the evidence into results for validation-selected policies, contextual published comparators, a matched first-round feedback ablation, and a feature-guided case analysis. Historical design traces are presented separately in Appendix~\ref{app:policy-revision}.
+
+\subsection{Matched First-Round Feedback Ablation}
+
+\paragraph{Comparison setup.}
+Within each domain, the two conditions share the same round, planner model and configuration, search starting point, candidate budget, training data, method catalog, exposure constraints, and training and evaluation settings. The feedback condition receives aggregate validation metrics, rankings, incumbent labels, and outcome-derived mechanism statements; the no-feedback condition omits these channels while retaining train-visible features and construction diagnostics. The executor applies the same validation-selection criterion to both conditions.
+
+The pairing has been verified through the policy, prompt, training, and evaluation records. It fixes the experimental conditions while allowing generated policies to respond to feedback. Table~\ref{tab:feedback-raw} reports the paired Round~1 results; Table~\ref{tab:no-feedback} compares the final validation-selected policy with the no-feedback candidate under the same domain-specific augmentation and one-epoch training budgets.
+
+\begin{table}[H]
+\centering
+\caption{Matched first-round feedback ablation. Within each domain, the paired rows share the round, candidate budget, planner configuration, source data, corpus budget, training, and evaluation protocol; only validation-feedback availability changes.}
+\label{tab:feedback-raw}
+\small
+\renewcommand{\arraystretch}{1.08}
+\setlength{\tabcolsep}{3.4pt}
+\rowcolors{2}{promptbluebg}{white}
+\begin{tabular}{llrrrrrrr}
+\toprule
+Domain & Planner context & HR@5 & NDCG@5 & R@10 & N@10 & R@20 & N@20 & MRR@20 \\
+\midrule
+Beauty & Feedback Round 1 & 0.0552 & 0.0382 & 0.0791 & 0.0459 & 0.1066 & 0.0528 & 0.0377 \\
+       & No feedback      & 0.0544 & 0.0380 & 0.0770 & 0.0453 & 0.1056 & 0.0525 & 0.0376 \\
+Toys   & Feedback Round 1 & 0.0530 & 0.0367 & 0.0749 & 0.0437 & 0.1012 & 0.0504 & 0.0361 \\
+       & No feedback      & 0.0537 & 0.0364 & 0.0756 & 0.0435 & 0.1027 & 0.0503 & 0.0355 \\
+Sports & Feedback Round 1 & 0.0328 & 0.0220 & 0.0496 & 0.0275 & 0.0692 & 0.0324 & 0.0221 \\
+       & No feedback      & 0.0308 & 0.0211 & 0.0456 & 0.0259 & 0.0631 & 0.0303 & 0.0211 \\
+\bottomrule
+\end{tabular}
+\rowcolors{1}{}{}
+\end{table}
+
+Under the matched Round~1 conditions, validation feedback improves all seven displayed metrics in Beauty and Sports. In Toys, it improves NDCG@5, NDCG@10, NDCG@20, and MRR@20, while the no-feedback policy is higher on HR@5, Recall@10, and Recall@20. The matched ablation therefore shows gains across all displayed metrics in Beauty and Sports and a Recall--NDCG trade-off in Toys.
+
+\subsection{Feature-Guided Case Study}
+
+\paragraph{Planner-visible feature prompt.}
+The planner received the following feature block as part of its Beauty research prompt. Here $L$ is the train-visible history length, a leaf category is the final normalized category component, and each item TID contains five words.
+
+\begingroup\footnotesize
+\promptlabel{USER\_FEATURES (name = computation; planner-visible meaning).}
+\begin{enumerate}[leftmargin=*,itemsep=1.5pt,topsep=3pt,label=\textcolor{promptblue}{\arabic*.}]
+\item \texttt{history\_length} $=L$; available sequential context.
+\item \texttt{p\_law\_item\_actual\_entropy} $=\operatorname{actual\_entropy}(\text{item-ID sequence})$; the supplied P-Law statistic, equal to $\ln L$ for this population.
+\item \texttt{category\_actual\_entropy} $=\operatorname{actual\_entropy}(\text{ordered leaf-category sequence})$; ordered category complexity.
+\item \texttt{category\_unique\_ratio} $=\#\text{unique leaf categories}/L$; category breadth.
+\item \texttt{category\_top\_share} $=\max_c \#c/L$; concentration in the most frequent category.
+\item \texttt{category\_shannon\_entropy\_norm} $=-\sum_c p_c\ln p_c/\ln L$; normalized category-frequency diversity.
+\item \texttt{category\_switch\_rate} $=\#\{c_t\neq c_{t-1}\}/(L-1)$; adjacent category switching.
+\item \texttt{tid\_unique\_ratio} $=\#\text{unique TID words}/(5L)$; TID vocabulary breadth.
+\item \texttt{tid\_top\_share} $=\max_w \#w/(5L)$; concentration of the most frequent TID word.
+\item \texttt{tid\_shannon\_entropy\_norm} $=-\sum_w p_w\ln p_w/\ln(5L)$; normalized TID-word frequency diversity.
+\item \texttt{adjacent\_tid\_jaccard\_mean} $=\operatorname{mean}_t |T_{t-1}\cap T_t|/|T_{t-1}\cup T_t|$; local semantic-word continuity.
+\item \texttt{early\_late\_tid\_jaccard} $=|T_{\mathrm{early}}\cap T_{\mathrm{late}}|/|T_{\mathrm{early}}\cup T_{\mathrm{late}}|$; persistence between the first and second history halves.
+\item \texttt{late\_new\_tid\_ratio} $=|T_{\mathrm{late}}\setminus T_{\mathrm{early}}|/|T_{\mathrm{late}}|$; recently introduced TID words.
+\item \texttt{item\_log\_popularity\_mean} $=\operatorname{mean}_i\ln(1+\operatorname{freq}_{\mathrm{train}}(i))$; average item popularity.
+\item \texttt{item\_log\_popularity\_std} $=\operatorname{std}_i\ln(1+\operatorname{freq}_{\mathrm{train}}(i))$; within-history popularity range.
+\item \texttt{long\_tail\_item\_ratio} $=\#\{i:\operatorname{freq}_{\mathrm{train}}(i)\leq 8\}/L$; share of items in the frozen training-frequency tail.
+\item \texttt{popularity\_trend} $=\operatorname{mean}_{\mathrm{late}}\ln(1+\operatorname{freq})-\operatorname{mean}_{\mathrm{early}}\ln(1+\operatorname{freq})$; movement toward more or less popular items.
+\end{enumerate}
+
+\promptlabel{CLUSTERING.}
+Retain all 17 features in the planner input. Fit the user clusters with the following 14 nonredundant coordinates:
+\begin{itemize}[leftmargin=*,itemsep=0pt,topsep=2pt,parsep=0pt]
+\item \texttt{history\_length}, \texttt{category\_actual\_entropy}, \texttt{category\_unique\_ratio}, \texttt{category\_top\_share}.
+\item \texttt{category\_shannon\_entropy\_norm}, \texttt{category\_switch\_rate}, \texttt{tid\_unique\_ratio}, \texttt{tid\_top\_share}.
+\item \texttt{adjacent\_tid\_jaccard\_mean}, \texttt{early\_late\_tid\_jaccard}.
+\item \texttt{item\_log\_popularity\_mean}, \texttt{item\_log\_popularity\_std}.
+\item \texttt{long\_tail\_item\_ratio}, \texttt{popularity\_trend}.
+\end{itemize}
+Apply median/IQR RobustScaler normalization. Compare KMeans $K=2,\ldots,8$ with \texttt{random\_state=42} and \texttt{n\_init=20}; among candidates whose smallest cluster contains at least 2\% of users, select the highest sampled silhouette.
+\endgroup
+
+\paragraph{Meaning of \texttt{cluster\_id}.}
+The resulting \texttt{cluster\_id} is the integer label produced by this frozen Beauty-specific KMeans fit. Figure~\ref{fig:beauty-clusters} shows why $K=2$ was selected and how the two groups differ. Cluster~0 contains 18,175 users and is higher on category breadth and switching. Cluster~1 contains 4,188 users and is higher on category concentration and TID-word overlap. Thus, \texttt{cluster\_id == 1} is a concrete predicate selecting the second feature group; it is not a user identifier or a rank.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/beauty_cluster_analysis.pdf}
+\caption{Beauty feature geometry used for policy routing. \textbf{A:} Sampled silhouette scores across candidate values of $K$ identify the selected cluster count. \textbf{B:} PCA projects the planner features with cluster assignments and projected medians. \textbf{C:} Cluster medians are shown relative to the full-population median.}
+\label{fig:beauty-clusters}
+\end{figure*}
+
+\Needspace{18\baselineskip}
+\paragraph{Representative augmentation example.}
+Consider a train-visible Beauty history of length four assigned to Cluster~1. Its feature profile belongs to the group with stronger category concentration and adjacent TID-word overlap, for which the selected policy supplies a GenPAS prefix view. The following excerpt shows how that history is presented to the recommender after augmentation.
+
+\begingroup\footnotesize
+\begin{promptblock}[samepage=true]
+Item text ID: [nail, art, pearl, stone, small]
+Title: Islandoffer Color Pearl Nail Art Stone Small Wheel
+Rhinestones Beads.
+
+<genpas_augmented_sequence>
+Item ID: 6066; Item text ID: [nail, art, pearl, stone, small]
+Item ID: 4171; Item text ID: [nail-art, 3d, colorful,
+slices, diy]
+Item ID: 1270; Item text ID: [nail-art, rhinestones,
+white-pearl, round, 1.5mm]
+\end{promptblock}
+\endgroup
+
+The original recommendation instruction and target remain unchanged; the augmentation contributes an additional structured view of the observed history. This example illustrates the policy-level transformation without introducing a separate user-level label or evaluation target.
+
+\subsection{Planner Prompt and Feature-Guided Policy}
+
+\paragraph{Prompt organization.}
+The formal planner input combines the task, train-visible data and features, clustering analysis, method definitions, applicability constraints, released validation evidence, and the JSON response contract. Table~\ref{tab:prompt-records} summarizes these components. The accompanying \emph{RecDataAgent Planner Protocol and Prompt Specification} provides an author-edited English specification of the formal interface, including the feedback-conditioned and no-feedback settings.
+
+\begin{table}[H]
+\centering
+\caption{Planner-input specification for feature-guided policy construction. Task context, user features and groups, method execution context, and validation evidence define the input channels; validation evidence supplies the outcome signal for policy revision.}
+\label{tab:prompt-records}
+\small
+\renewcommand{\arraystretch}{1.14}
+\setlength{\tabcolsep}{4pt}
+\rowcolors{2}{promptbluebg}{white}
+\begin{tabular}{p{0.29\columnwidth}p{0.61\columnwidth}}
+\toprule
+Component & Content and role \\
+\midrule
+Task and data context & Recommendation task, train-visible histories, item information, and the unchanged base corpus. \\
+Features and user groups & Feature definitions, distribution summaries, clustering, and executable route predicates. \\
+Method and execution context & Baseline methods, applicability, exposure constraints, and the response schema. \\
+Validation feedback & Completed validation outcomes, rankings, and incumbent labels for policy revision. \\
+\bottomrule
+\end{tabular}
+\rowcolors{1}{}{}
+\end{table}
+
+\noindent The no-feedback condition retains the task, feature, and execution components while withholding outcome-derived planner context. The executor applies the same fixed validation-selection criterion in both conditions.
+
+\paragraph{Language and presentation.}
+The production planner prompt was issued in Chinese. The feature definitions and operative instructions are organized here as an English protocol specification, with the Beauty policy providing a concrete case study.
+
+\paragraph{Recommendation instruction.}
+\begingroup\footnotesize
+\begin{promptblock}
+Based on the user's historical product interaction sequence,
+predict the next product's characteristic words.
+Each product is represented by exactly 5 characteristic words
+enclosed in square brackets []. The historical sequence shows
+the user's interaction pattern.
+\end{promptblock}
+\endgroup
+
+\paragraph{Operative prompt rendering.}
+\begingroup\footnotesize
+\noindent\textbf{Role and task.}
+Act as a recommendation-data research agent for Beauty sequential recommendation with Qwen3-4B-Instruct-2507. Propose exactly three substantively different augmentation hypotheses, rather than three variants of one length threshold. Separate observed statistics, mechanism hypotheses, and candidate evaluation objectives.
+
+\noindent\textbf{Data and input.}
+The base corpus contains 34,464 JSON records, each with exactly three string fields: \texttt{instruction}, \texttt{input}, and \texttt{output}. Its first 22,363 records are recommendation examples and its remaining 12,101 records are item-description-to-five-word-TID examples. The augmentation source contains 22,363 users with train-visible histories of length 3--18. Policy generation is restricted to \texttt{user\_idx}, \texttt{sequence\_item\_ids}, \texttt{sequence\_tids}, derived train-visible features, and the train-visible catalog.
+
+\noindent\textbf{Base corpus and appended views.}
+Each candidate dataset retains one unchanged copy of the complete base corpus in its original order. An augmentation creates a new record by copying the matched base record's \texttt{instruction} and \texttt{output} and appending the selected method view to its \texttt{input}. Each selected user contributes one appended row, giving coverage histogram \texttt{\{"1": N\}} for $N$ unique users.
+
+\noindent\textbf{Available methods and routes.}
+Use the listed methods with their actual signatures. The available method implementations are \texttt{asarrec\_dual\_view}, \texttt{genpas\_prefix\_view}, and \texttt{l2aug\_sequence\_view}. A feature route contains one to eight conjunctive numeric predicates using \texttt{<}, \texttt{<=}, \texttt{>}, \texttt{>=}, \texttt{==}, or inclusive \texttt{between}; \texttt{cluster\_id} may only be compared for equality to an existing integer. Within a candidate, routes must be mutually exclusive. The selected streams are combined by the declared route assignment, and any uncovered selected user must go to an explicit remainder stream.
+
+\noindent\textbf{Coverage conditions.}
+Execution checks method applicability for every selected user, preserves unique-user exposure, and routes the complete remainder explicitly. A missing predicate or method triggers a minimal capability request and dry-run before materialization.
+
+\noindent\textbf{Evidence checks.}
+Exact joint-predicate counts, interface signatures, and applicability are verified through \texttt{code\_evidence}. Each dry-run reports covered users, remainder users, cross-route overlap, and method applicability.
+
+\noindent\textbf{Feedback and selection.}
+Use aggregate validation outcomes to revise proposals. The experiment-level validation objective is fixed before candidate generation and governs ranking and final selection. Candidate-specific hypotheses describe comparisons within that protocol. Test outcomes are reserved for reporting after the policies and comparisons are fixed.
+
+\Needspace{25\baselineskip}
+\noindent\textbf{Response protocol.}
+Return a complete JSON object whose root contains exactly \texttt{action}, \texttt{reason}, \texttt{experiments}, and \texttt{requests}. The action is either \texttt{execute} or \texttt{needs\_capability}. For \texttt{execute}, return exactly three experiments and an empty request list; for \texttt{needs\_capability}, return an empty experiment list and at least one concrete request.
+
+\begin{promptblock}[samepage=true]
+{
+  "action": ..., "reason": ...,
+  "experiments": [{
+    "name": ..., "total_exposure": ...,
+    "operators": [{"name": ..., "params": ...}],
+    "rationale": ..., "risks_and_checks": ...,
+    "coverage": {
+      "unique_users": N,
+      "exposure_histogram": {"1": N}
+    },
+    "comparison": {
+      "reference": ..., "primary_metric": ...,
+      "hypothesis": ..., "changed": [...], "fixed": [...],
+      "interpretation": ...
+    }
+  }],
+  "requests": [{
+    "kind": ..., "target": ...,
+    "details": ..., "why_needed": ...
+  }]
+}
+\end{promptblock}
+Each request \texttt{kind} must be either \texttt{implement\_function} or \texttt{code\_evidence}; each method entry contains exactly \texttt{name} and \texttt{params}. The primary metric must be one of Recall@10, NDCG@10, Recall@20, or NDCG@20.
+The \texttt{primary\_metric} field is a candidate-level hypothesis annotation rather than a selection control: it may name the metric emphasized by that candidate's proposed comparison, but it cannot override the fixed experiment-level validation utility, which is validation Recall@10 as specified above.
+\endgroup
+
+\paragraph{Feature-guided policy definition.}
+\begingroup\footnotesize
+\begin{promptblock}
+genpas_prefix_view(
+  source_id="beauty-all-train-visible-v1",
+  policy_id="genpas_full_available_seed42_v1",
+  output_stream="cgeom_genpas",
+  applicability="require_all")
+
+asarrec_dual_view(
+  source_id="beauty-all-train-visible-v1",
+  policy_id="asarrec_full_available_seed42_v1",
+  output_stream="cgeom_asarrec",
+  applicability="require_all")
+
+feature_route_select(
+  routes=[{
+    stream: "cgeom_genpas",
+    query: {all: [{
+      feature: "cluster_id", op: "==", value: 1
+    }]},
+    applicability: "require_all"
+  }],
+  remainder_stream="cgeom_asarrec",
+  merge="concatenate")
+
+emit_standard_artifacts()
+\end{promptblock}
+\endgroup
+
+\paragraph{Alternative hypotheses.}
+The response also proposed routes based on zero early-versus-late TID-word overlap and on joint long-tail exposure with decreasing popularity. The selected case above records the validation-selected cluster-geometry policy used for the reported Beauty result.
+
+\paragraph{Research linkage.}
+The prompt, feature representation, clustering analysis, and representative augmentation example define the intervention studied in the Beauty experiment. The policy specification maps train-visible feature geometry to the available augmentation views while preserving the original recommendation supervision. The resulting corpus is evaluated under the validation-guided selection protocol in Section~\ref{sec:exp-setup}, and the selected policy's Beauty performance is given in Table~\ref{tab:overall}. Together, these elements connect the planner input, the policy decision, and the corpus-level experiment.
+
+\Needspace{8\baselineskip}
+\section{Feedback-Driven Policy Revision}
+\label{app:policy-revision}
+
+This section documents how feedback informs both the analytical basis
+used to route users and the augmentation configuration applied after
+routing. The historical design records link planner inputs, method
+plans, realized coverage, and recorded aggregate outcomes. They complement
+the matched feedback ablation in Table~\ref{tab:feedback-raw} and are
+presented separately from the formal rounds in Table~\ref{tab:three-rounds}.
+
+\paragraph{What counts as a revision.}
+We treat route predicates and feature partitions as the \emph{analytical
+basis}, and methods, exposure allocation, merge rule, and repetition as the
+\emph{augmentation configuration}. This separates whom to route from which
+view to supply and at what dose.
+
+\begin{table}[H]
+\centering
+\caption{Historical Beauty policy revisions and recorded outcomes. Each trace lists its routing basis, method exposure, and Recall@10; the matched feedback ablation is reported separately in Table~\ref{tab:feedback-raw}.}
+\label{tab:policy-revision-trace}
+\small
+\renewcommand{\arraystretch}{1.08}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.15\columnwidth}
+                >{\raggedright\arraybackslash}p{0.34\columnwidth}
+                >{\raggedright\arraybackslash}p{0.36\columnwidth}
+                r@{}}
+\toprule
+Trace & Routing basis & Method / dose & R@10 \\
+\midrule
+research-1 &
+GenPAS: $L=3$--6; AsarRec: $L=7$--18 &
+GenPAS 15,874; AsarRec 6,489; total 22,363 &
+0.0771 \\
+research-2 &
+AsarRec: $L=3$--5, $10$--18; GenPAS: $L=6$--9 &
+AsarRec 17,610; GenPAS 4,753; total 22,363 &
+0.0626 \\
+research-3 &
+GenPAS: $L=3$--6, $13$--18; AsarRec: $L=7$--12 &
+GenPAS 18,063; AsarRec 4,300; total 22,363 &
+0.0736 \\
+feedback candidate &
+No length route; stable round-robin &
+AsarRec 11,875; GenPAS 3,125; total 15,000; 3,125 repeated &
+0.0752 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Direct evidence from the trace.}
+The analytical basis is not fixed: the first trace uses two length segments,
+the second uses three with GenPAS in the middle, and the third moves
+$L=13$--18 back to GenPAS while retaining AsarRec for $L=7$--12. The recorded
+predicates document successive changes in contextual assignment.
+
+The augmentation configuration also changes. Across the three research
+traces, the method pair remains GenPAS plus AsarRec, but the exposure
+allocation changes from 15,874/6,489 to 4,753/17,610 and then to
+18,063/4,300. The feedback candidate changes the budget to 15,000 and uses
+stable round-robin mixing with 3,125 repeated exposures. Thus, both routing
+and method/dose configuration are revised.
+
+\paragraph{Feedback enters the next design.}
+The feedback-conditioned record compares historical single-method results,
+notes the all-user AsarRec baseline (Recall@10 $=0.0781$) above GenPAS ($=0.0733$)
+and L2Aug ($=0.0677$), and proposes an AsarRec-heavy mixture with a smaller
+GenPAS component. That candidate materialized with 15,000 appended rows, one
+unchanged base-corpus copy, and zero target or view truncation. This record shows
+how archived outcomes inform the next policy's method and exposure choices.
+
+\paragraph{Relation to the formal experiments.}
+The verified records organize this evidence by its experimental role.
+These design examples describe changes in routing and exposure.
+Table~\ref{tab:feedback-raw} provides the matched feedback comparison, and
+Table~\ref{tab:three-rounds} reports the formal validation-guided sequence.

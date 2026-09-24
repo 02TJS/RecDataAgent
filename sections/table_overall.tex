@@ -1,0 +1,52 @@
+\begin{table*}[!b]
+\centering
+\caption{Recommendation performance across the three Amazon domains. All baseline methods included in the table retain their method-specific constructions and objectives; \method{} additionally performs user-conditioned data-policy construction and feedback-guided revision. Locally evaluated rows use the matched local protocol, while externally reported rows retain their source protocols. The \method{} row is the validation-selected policy used for final reporting.}
+\label{tab:overall}
+\small
+\setlength{\tabcolsep}{3.2pt}
+\renewcommand{\arraystretch}{1.08}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{lclrrrrrrr}
+\toprule
+Domain & Group & Method & \multicolumn{2}{c}{Top-5} & \multicolumn{2}{c}{Top-10} & \multicolumn{3}{c}{Top-20} \\
+\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-10}
+& & & HR@5 & NDCG@5 & Recall@10 & NDCG@10 & Recall@20 & NDCG@20 & MRR@20 \\
+\midrule
+\multirow[c]{9}{*}{Beauty} & \multirow[c]{3}{*}{\shortstack[c]{Base\\Models}} & SASRec & 0.0364 & 0.0233 & 0.0550 & 0.0289 & 0.0766 & 0.0338 & 0.0238 \\
+& & BERT4Rec & 0.0211 & 0.0133 & 0.0357 & 0.0181 & 0.0493 & 0.0212 & 0.0149 \\
+& & HSTU & 0.0388 & 0.0258 & 0.0593 & 0.0322 & 0.0832 & 0.0381 & 0.0262 \\
+\cmidrule(lr){2-10}
+& \multirow[c]{2}{*}{\shortstack[c]{Generative\\Recommenders}} & OneRec-Think & 0.0507 & 0.0365 & 0.0732 & 0.0441 & 0.0995 & 0.0505 & 0.0361 \\
+& & GRLM & 0.0399 & 0.0274 & 0.0591 & 0.0343 & 0.0828 & 0.0403 & 0.0275 \\
+\cmidrule(lr){2-10}
+& \multirow[c]{3}{*}{\shortstack[c]{Data\\Policy\\Recommenders}} & L2Aug & 0.0468 & 0.0321 & 0.0677 & 0.0390 & 0.0949 & 0.0457 & 0.0319 \\
+& & GenPAS & 0.0508 & 0.0351 & 0.0730 & 0.0421 & 0.1019 & 0.0493 & 0.0349 \\
+& & AsarRec & 0.0546 & 0.0383 & 0.0784 & 0.0456 & 0.1058 & 0.0531 & 0.0379 \\
+\rowcolor{methodblue} & & \method{} &\textbf{0.0563}&\textbf{0.0387}&\textbf{0.0800}&\textbf{0.0463}&\textbf{0.1087}&\textbf{0.0535}&\textbf{0.0380}\\
+\midrule
+\multirow[c]{9}{*}{Toys} & \multirow[c]{3}{*}{\shortstack[c]{Base\\Models}} & SASRec & 0.0404 & 0.0271 & 0.0570 & 0.0327 & 0.0762 & 0.0375 & 0.0270 \\
+& & BERT4Rec & 0.0196 & 0.0120 & 0.0302 & 0.0154 & 0.0408 & 0.0175 & 0.0126 \\
+& & HSTU & 0.0333 & 0.0227 & 0.0522 & 0.0281 & 0.0701 & 0.0319 & 0.0230 \\
+\cmidrule(lr){2-10}
+& \multirow[c]{2}{*}{\shortstack[c]{Generative\\Recommenders}} & OneRec-Think & 0.0527 & 0.0375 & 0.0732 & 0.0441 & 0.0995 & 0.0505 & 0.0361 \\
+& & GRLM & 0.0440 & 0.0304 & 0.0626 & 0.0364 & 0.0850 & 0.0420 & 0.0299 \\
+\cmidrule(lr){2-10}
+& \multirow[c]{3}{*}{\shortstack[c]{Data\\Policy\\Recommenders}} & L2Aug & 0.0484 & 0.0338 & 0.0679 & 0.0402 & 0.0916 & 0.0461 & 0.0333 \\
+& & GenPAS & 0.0534 & 0.0368 & 0.0737 & 0.0433 & 0.0987 & 0.0497 & 0.0357 \\
+& & AsarRec & 0.0457 & 0.0320 & 0.0654 & 0.0383 & 0.0882 & 0.0441 & 0.0316 \\
+\rowcolor{methodblue} & & \method{} &\textbf{0.0592}&\textbf{0.0410}&\textbf{0.0828}&\textbf{0.0487}&\textbf{0.1108}&\textbf{0.0557}&\textbf{0.0401}\\
+\midrule
+\multirow[c]{9}{*}{Sports} & \multirow[c]{3}{*}{\shortstack[c]{Base\\Models}} & SASRec & 0.0183 & 0.0097 & 0.0272 & 0.0127 & 0.0381 & 0.0147 & 0.0103 \\
+& & BERT4Rec & 0.0093 & 0.0059 & 0.0158 & 0.0080 & 0.0218 & 0.0094 & 0.0065 \\
+& & HSTU & 0.0245 & 0.0158 & 0.0312 & 0.0209 & 0.0436 & 0.0247 & 0.0167 \\
+\cmidrule(lr){2-10}
+& \multirow[c]{2}{*}{\shortstack[c]{Generative\\Recommenders}} & OneRec-Think & 0.0264 & 0.0179 & 0.0377 & 0.0219 & 0.0528 & 0.0258 & 0.0176 \\
+& & GRLM & 0.0236 & 0.0155 & 0.0376 & 0.0201 & 0.0522 & 0.0235 & 0.0159 \\
+\cmidrule(lr){2-10}
+& \multirow[c]{3}{*}{\shortstack[c]{Data\\Policy\\Recommenders}} & L2Aug & 0.0245 & 0.0162 & 0.0387 & 0.0207 & 0.0567 & 0.0252 & 0.0166 \\
+& & GenPAS & 0.0311 & 0.0204 & 0.0460 & 0.0255 & 0.0668 & 0.0302 & 0.0203 \\
+& & AsarRec & 0.0327 & 0.0219 & 0.0481 & 0.0273 & 0.0661 & 0.0319 & 0.0221 \\
+\rowcolor{methodblue} & & \method{} &\textbf{0.0385}&\textbf{0.0265}&\textbf{0.0569}&\textbf{0.0324}&\textbf{0.0779}&\textbf{0.0378}&\textbf{0.0261}\\
+\bottomrule
+\end{tabular}}
+\end{table*}

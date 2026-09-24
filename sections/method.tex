@@ -1,0 +1,311 @@
+\section{Preliminaries and Problem Definition}
+\label{sec:problem-definition-section}
+
+This section defines the sequential recommendation task and the augmentation policy optimized by RecDataAgent.
+
+\subsection{Sequential Recommendation and Augmentation Policy}
+\label{sec:problem-definition}
+
+\textbf{Sequential recommendation.} For domain $\delta$, let $\mathcal{E}_{\delta}$ denote data units, $s_e\in\mathcal{S}_{\delta}$ their train-visible interaction histories and item context, and $D^0_{\delta}$ the immutable base corpus. For a candidate corpus $D$, fixed-protocol training yields parameters $\theta_D$; the recommender predicts $\widehat y_e=f_{\theta_D}(s_e)$, and validation returns aggregate outcomes $\mathbf{y}_D$.
+
+\textbf{Augmentation policy.} Let $\mathcal{R}_{\delta}$ be the catalog of typed data-construction methods. A policy $\pi$ maps the train-visible contexts to user routes, methods, and exposures, inducing an appended corpus $\widehat D_{\delta}(\pi)$ and complete corpus $D_{\delta}(\pi)=D^0_{\delta}\mathbin{\uplus}\widehat D_{\delta}(\pi)$. The downstream learner returns validation outcomes $\mathbf{y}_{\delta}(\pi)=G_{\delta}(D_{\delta}(\pi))$ and validation utility $J_{\delta}(\pi)=\mathcal{U}_{\delta}(\mathbf{y}_{\delta}(\pi))$. Test outcomes are used only for performance reporting and do not enter policy search.
+
+\subsection{Policy Selection}
+\label{sec:data-policy-selection}
+
+\textbf{Policy selection.} Before training, the policy observes $\mathcal{E}_{\delta}$, $\{s_e:e\in\mathcal{E}_{\delta}\}$, $D^0_{\delta}$, $\mathcal{R}_{\delta}$, the released archive $\mathcal{H}_{t}$, and fixed exposure budget $Q_{\delta}$. It searches $\pi\in\Pi_{\delta}^{\mathrm{feas}}$ to maximize $J_{\delta}(\pi)$; because the next records and outcomes are unavailable, routing, assignment, and exposure must be searched jointly. RecDataAgent combines train-visible features, typed execution, and aggregate validation feedback for this search.
+
+\section{Method}
+\label{sec:method}
+
+Once the policy objective and the information boundary are fixed, the remaining problem is to construct, execute, and revise complete policies under the typed data interfaces.
+RecDataAgent separates this procedure into policy formulation, typed execution, archive search, and policy revision.
+Figure~\ref{fig:overview} summarizes the resulting policy--adapter interface.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=.99\textwidth]{figures/recdataagent_overview_v31.pdf}
+\caption{\method{} as a typed policy-search loop. The controller proposes a complete user-conditioned policy; schema and run validators materialize only feasible records; downstream validation supplies outcome evidence; and the archive uses outcomes and construction diagnostics to form the next candidate batch.}
+\label{fig:overview}
+\end{figure*}
+
+\subsection{Policy Formulation}
+
+We now define the policy object independently of any particular method implementation. The construction has three stages: encode train-visible context, assign typed actions with explicit exposure, and evaluate the resulting complete corpus through the downstream learner.
+
+For downstream domain $\delta$, let $\mathcal{E}_{\delta}$ be its data units and $s_e\in\mathcal{S}_{\delta}$ the train-visible source context of unit $e\in\mathcal{E}_{\delta}$. 
+Let $D^0_{\delta}$ denote the immutable base corpus and let $B_{\delta}(e)=\{b\in D^0_{\delta}:e(b)=e\}$ be the (multi)set of base records owned by $e$.
+A deterministic encoder converts this source context into the representation
+\begin{equation}
+ z_e=\phi_{\delta}(s_e)\in\mathcal{Z}_{\delta}.
+ \label{eq:abstract_context}
+\end{equation}
+The context can cover behavioral, semantic, temporal, and structural information available before downstream evaluation.
+Because the context is computed before downstream evaluation, it does not include evaluation labels, predictions, or outcomes.
+
+A typed transformation module serves as a data-construction method.
+For a method $o$ with parameter $\eta$, the typed transformation has the form
+\begin{equation}
+ \begin{aligned}
+ o_{\eta}&=\left(A_{o,\eta},T_{o,\eta},\Gamma_{o,\eta}\right),&
+ A_{o,\eta}&:\mathcal{Z}_{\delta}\rightarrow\{0,1\},\\
+ (T_{o,\eta},\Gamma_{o,\eta})&:
+ \mathcal{S}_{\delta}
+ \rightarrow\mathsf{View}_{\delta}^{*}\times\mathsf{Trace}_{\delta}^{*}.
+ \end{aligned}
+ \label{eq:method_tuple}
+\end{equation}
+The superscript $*$ serves as notation for a finite collection.
+Here $A_{o,\eta}$ decides applicability, $T_{o,\eta}$ emits train-visible views, and $\Gamma_{o,\eta}$ returns an auditable trace for each emitted view.
+If $A_{o,\eta}(z_e)=0$, no view is emitted and an explicit inapplicable status is recorded.
+Methods never receive base-record targets; the materializer binds each view to a base record instead.
+The interface is shared across sequence views, retrieved context, relabeled examples, and synthetic views, requiring each to declare its inputs, outputs, applicability, and provenance.
+
+A policy coordinates contextual routing and corpus-level exposure allocation through the following representation:
+\begin{equation}
+ \pi=\left(\mathbf{r},\nu,\kappa\right),\qquad
+ \mathbf{r}=\big((g_1,o_1,\eta_1),\ldots,(g_R,o_R,\eta_R),(g_0,o_0,\eta_0)\big),
+ \label{eq:policy_tuple}
+\end{equation}
+where $g_j:\mathcal{Z}_{\delta}\rightarrow\{0,1\}$ is a route predicate and the final tuple specifies an explicit remainder action.
+The allocation rule $\nu$ maps the context population and declared route quotas to a nonnegative exposure vector $\boldsymbol{\nu}_{\pi}\in\mathbb{N}_0^{|\mathcal{E}_{\delta}|}$, where $\nu_{\pi,e}$ is the exposure assigned to unit $e$.
+For each unit, first-match routing has the form
+\begin{equation}
+ a_{\pi}(e)=
+ \begin{cases}
+ (o_j,\eta_j), & j=\min\{\ell:g_\ell(z_e)=1\},\\
+ (o_0,\eta_0), & \text{if no non-remainder predicate fires}.
+ \end{cases}
+ \label{eq:policy_action}
+\end{equation}
+Let $T_{a_{\pi}(e)}$ denote $T_{o_j,\eta_j}$ when $a_{\pi}(e)=(o_j,\eta_j)$.
+The constraint set $\kappa$ instantiates domain-independent requirements with an exposure budget, coverage, identity preservation, label invariance, and applicability.
+The adapter covers any additional constraints specific to the domain.
+
+The policy produces an append multiset and couples it to the immutable base to form the complete training corpus:
+\begin{equation}
+ \begin{aligned}
+ \widehat D_{\delta}(\pi)
+ &=\biguplus_{e\in\mathcal{E}_{\delta}}
+ \operatorname{Bind}_{\delta}\!\left(
+ B_{\delta}(e),
+ \mathsf{Expose}_{\nu_{\pi,e}}\!
+ \left(T_{a_{\pi}(e)}(s_e)\right)\right),\\
+ D_{\delta}(\pi)
+ &=D^0_{\delta}\mathbin{\uplus}\widehat D_{\delta}(\pi).
+ \end{aligned}
+ \label{eq:induced_corpus}
+\end{equation}
+At exposure $q$, $\mathsf{Expose}_{q}:\mathsf{View}_{\delta}^{*}\to\mathsf{View}_{\delta}^{*}$ is the deterministic rule for selecting or repeating views; no record is emitted when $q=0$.
+$\operatorname{Bind}_{\delta}:\mathsf{Base}_{\delta}^{*}\times\mathsf{View}_{\delta}^{*}\to\mathsf{Record}_{\delta}^{*}$ attaches views to base records and leaves the fields declared immutable by the adapter unchanged.
+This separation keeps transformation content distinct from supervision quantity and leaves base targets unavailable to method decisions.
+Let $D_{\delta}^{\mathrm{src}}=\{(e,s_e,B_{\delta}(e))\}_{e\in\mathcal{E}_{\delta}}$ denote the source package.
+Policy feasibility depends on passing the adapter checks for the declarative schema, the declared constraints, and the realized record--trace pair:
+\begin{equation}
+ \Pi_{\delta}^{\mathrm{feas}}
+ =\left\{\pi\in\Pi_{\delta}:
+ V_{\delta}^{\mathrm{sch}}(\pi)=1,\ 
+ \pi\models\kappa,\ 
+ V_{\delta}^{\mathrm{run}}\!\left(\pi,
+ X_{\delta}(\pi,D_{\delta}^{\mathrm{src}})\right)=1\right\}.
+ \label{eq:feasible_policy}
+\end{equation}
+The schema check validates the declaration before materialization; the run check validates the record--trace pair returned by $X_{\delta}$ below.
+Intended allocation, realized records, and contract-check status are kept distinct throughout execution, preventing one from being mistaken for another.
+
+After corpus construction, the downstream learner supplies the only utility used to evaluate a complete policy:
+\begin{equation}
+ \mathbf{y}_{\delta}(\pi)
+ =G_{\delta}\!\left(D_{\delta}(\pi)\right),\qquad
+ J_{\delta}(\pi)=\mathcal{U}_{\delta}\!\left(\mathbf{y}_{\delta}(\pi)\right),\qquad
+ \pi_{\delta}^{\star}\in
+ \underset{\pi\in\Pi_{\delta}^{\mathrm{feas}}}{\operatorname{arg\,max}}\ J_{\delta}(\pi).
+ \label{eq:domain_objective}
+\end{equation}
+$G_{\delta}$ follows the fixed training, validation, and randomness protocol. Equation~\eqref{eq:domain_objective} defines the search objective; execution selects the highest-validation-utility completed candidate.
+This utility cannot be replaced by the planner: a method-local surrogate is not the complete-policy outcome.
+The downstream learner evaluates the complete corpus and couples its quality to every local assignment through this black-box utility.
+The concrete validation utility, aggregation procedure, and tie-breaking rule used in our experiments are specified in Appendix~\ref{app:experiments}.
+
+Let $\Pi_{\delta}^{\mathrm{contextual}}$ denote the policies above and let $\Pi_{\delta}^{\mathrm{global}}$ be the subset with context-independent action selection and exposure allocation.
+A global configuration is the special case with one context-independent action, including a fixed mixture supplied by a deterministic merge action:
+\begin{equation}
+ \Pi_{\delta}^{\mathrm{global}}\subseteq
+ \Pi_{\delta}^{\mathrm{contextual}}.
+ \label{eq:policy_containment}
+\end{equation}
+If a domain contains at least two distinguishable contexts and the method catalog offers compatible actions with different outputs, the inclusion in \eqref{eq:policy_containment} is strict.
+Contextual allocation enlarges the policy class and leaves the downstream learner unchanged.
+
+\subsection{Typed Execution}
+
+The framework separates domain-specific adaptation from domain-independent policy search. This is the execution layer: the policy declares what should happen, the adapter determines how a valid record and trace are materialized, and the validator decides whether the realized result can enter the evidence archive.
+For domain $\delta$, the adapter interface has the form
+\begin{equation}
+ \mathcal{I}_{\delta}
+ =\left(\phi_{\delta},\mathcal{R}_{\delta},
+ V_{\delta}^{\mathrm{sch}},V_{\delta}^{\mathrm{run}},
+ X_{\delta},G_{\delta}\right),
+ \label{eq:domain_adapter}
+\end{equation}
+Here $\mathcal{R}_{\delta}$ is the catalog of typed sources and data-construction methods, $V_{\delta}^{\mathrm{sch}}$ validates the declarative recipe, $X_{\delta}$ materializes it deterministically (including $\operatorname{Bind}_{\delta}$), $V_{\delta}^{\mathrm{run}}$ checks realized records and provenance, and $G_{\delta}$ measures the downstream task.
+The controller uses these interfaces without either accessing domain-specific files or invoking methods outside the catalog.
+
+With $\Pi_{\delta}^{\mathrm{sch}}=\{\pi\in\Pi_{\delta}:V_{\delta}^{\mathrm{sch}}(\pi)=1\}$, the materializer and run validator have the typed signatures
+\begin{equation}
+ \begin{aligned}
+ X_{\delta}&:
+ \Pi_{\delta}^{\mathrm{sch}}\times D_{\delta}^{\mathrm{src}}
+ \longrightarrow
+ \mathsf{Record}_{\delta}^{*}\times\mathsf{Trace}_{\delta}^{*},\\
+ V_{\delta}^{\mathrm{run}}&:
+ \Pi_{\delta}^{\mathrm{sch}}\times
+ \left(\mathsf{Record}_{\delta}^{*}\times\mathsf{Trace}_{\delta}^{*}\right)
+ \longrightarrow\{0,1\}.
+ \end{aligned}
+ \label{eq:materializer_interface}
+\end{equation}
+For every emitted record $r$, let $\beta(r)\in D^0_{\delta}$ be its base binding and $\gamma(r)$ its method trace returned with the view.
+Let $\mathcal{F}_{\delta}^{\mathrm{fix}}$ denote the fields declared immutable by the task adapter.
+The record contract has the form
+\begin{equation}
+ \begin{aligned}
+ e(r)&=e(\beta(r)),&
+ f(r)&=f(\beta(r))\quad\forall f\in\mathcal{F}_{\delta}^{\mathrm{fix}},\\
+ \operatorname{trace}(r)&=(\beta(r),o,\eta,\gamma(r)).
+ \end{aligned}
+ \label{eq:record_contract}
+\end{equation}
+For a schema-valid policy, $X_{\delta}$ converts the source package into the multiset in \eqref{eq:induced_corpus}.
+The contract preserves record identity and leaves the task constraints unchanged across implementations.
+
+Routes are evaluated over the context package and combined by a deterministic merge method.
+If $R_j(\pi)$ is the first-match set induced by $g_j$,
+\begin{equation}
+ \displaystyle
+ R_j(\pi)=\{e:g_j(z_e)=1\}\setminus\bigcup_{\ell<j}R_\ell(\pi),
+ \quad
+ R_0(\pi)=\mathcal{E}_{\delta}\setminus\bigcup_{j=1}^{R}R_j(\pi).
+ \label{eq:abstract_routes}
+\end{equation}
+These sets are a disjoint partition before applicability filtering.
+Unsupported actions are retained as explicit trace outcomes, preventing their silent removal from the execution record.
+For the realized records, exposure and coverage have the form
+\begin{equation}
+ \displaystyle
+ n_e(\pi)=\sum_{r\in\widehat D_{\delta}(\pi)}\mathbf{1}[e(r)=e],
+ \quad
+  N(\pi)=\sum_{e}n_e(\pi),
+ \quad
+ \rho(\pi)=\frac{|\{e:n_e(\pi)>0\}|}{|\mathcal{E}_{\delta}|}.
+ \label{eq:abstract_accounting}
+\end{equation}
+The accounting remains valid for multiple emitted views: multiplicity is measured at the record level, and ownership is read from the trace.
+Within each policy evaluation, the run validator checks whether realized quantities match allocated exposures and declared corpus constraints.
+
+Here, for RecDataAgent, $\mathcal{E}_{\delta}$ is the user population, $s_e$ supplies train-visible interaction histories and item information, and $\phi_{\delta}$ produces behavioral and semantic features.
+Here the catalog contains recommendation data-construction methods, $\mathcal{F}_{\delta}^{\mathrm{fix}}$ contains the instruction and target, $\operatorname{Bind}_{\delta}$ appends each generated view to the input while copying those fields, and $G_{\delta}$ supplies the target recommendation training and evaluation procedure.
+These choices instantiate the adapter with recommendation-specific data, records, and evaluation.
+The policy grammar, route semantics, materialization contracts, and search controller are unchanged.
+Structural portability depends on the separation between the adapter and the search controller.
+
+\paragraph{Structural portability.}
+For a new domain $\delta'$, let the adapter supply a context encoder, a typed method catalog, schema and run validators, a deterministic materializer, and an aggregate evaluator satisfying the contracts above.
+Replacing $\mathcal{I}_{\delta}$ with $\mathcal{I}_{\delta'}$ keeps the policy grammar, planner, route semantics, archive update, and feedback protocol well-defined, while $\delta'$ determines the feature and record types.
+Let $\Pi(\mathcal{R})$ denote the policies formed from catalog $\mathcal{R}$.
+Adding a method $\tilde o$ gives the policy-space inclusion
+\begin{equation}
+ \mathcal{R}_{\delta}'=\mathcal{R}_{\delta}\cup\{\tilde o\}
+ \quad\Longrightarrow\quad
+ \Pi(\mathcal{R}_{\delta})\subseteq\Pi(\mathcal{R}_{\delta}'),
+ \label{eq:method_extension}
+\end{equation}
+provided that $\tilde o$ satisfies the same typed contract.
+These contracts preserve the search interface across domains and methods, with each adapter supplying its task-specific validation objective.
+Because no controller rule depends on a particular adapter implementation, substituting the new adapter into every typed call preserves the implication.
+
+\subsection{Archive Search}
+
+Once the policy language and typed execution contract are fixed, the remaining problem is search over complete policies. At round $t$, the search controller maintains the task context and evidence archive and generates candidates according to
+\begin{equation}
+ C_t=\left(\mathcal{T}_{\delta},\mathcal{F}_{\delta},
+ \mathcal{R}_{\delta},\mathcal{H}_t\right),
+ \qquad
+ \Pi_t=P_{\theta}(C_t)
+ =\{\pi_t^{(1)},\ldots,\pi_t^{(K)}\}.
+ \label{eq:agent_context}
+\end{equation}
+Here $\mathcal{T}_{\delta}$ specifies the task and hard constraints, $\mathcal{F}_{\delta}$ summarizes the context population, $\mathcal{R}_{\delta}$ describes method capabilities, and $\mathcal{H}_t$ contains completed validation outcomes and construction diagnostics.
+The planner's outcome context consists of validation aggregates, rankings, and incumbent labels; it receives no held-out labels, per-user predictions, or model weights. Source paths are provenance labels, not filesystem access.
+In RecDataAgent, a language model implements $P_{\theta}$, while $\operatorname{Update}$ records aggregate validation feedback.
+The output is a batch of declarative policies, not executable code.
+
+For each candidate, the typed transition has the form
+\begin{equation}
+ \pi_t^{(k)}
+ \xrightarrow{V_{\delta}^{\mathrm{sch}}}
+ (v_t^{(k)},d_t^{(k)})
+ \xrightarrow[\ v_t^{(k)}=1\ ]{X_{\delta}}
+ (\widehat D_t^{(k)},\tau_t^{(k)})
+ \xrightarrow{V_{\delta}^{\mathrm{run}}}
+ v_{t,\mathrm{run}}^{(k)}
+ \xrightarrow[\ v_{t,\mathrm{run}}^{(k)}=1\ ]{G_{\delta}}
+  \mathbf{y}_t^{(k)}
+  \xrightarrow{\operatorname{Update}}
+ \mathcal{H}_{t+1}.
+\label{eq:agent_transition}
+\end{equation}
+
+\begin{table*}[!t]
+\centering
+\caption{Dataset and constructed-corpus statistics for the three Amazon domains. Users, items, interactions, mean history length, sparsity, base records, and appended records are reported for the processed populations and the principal agent-run configurations.}
+\label{tab:data-stats}
+\small
+\setlength{\tabcolsep}{5.5pt}
+\begin{tabular}{lrrrrrrr}
+\toprule
+Domain & Users & Items & Interactions & Avg.\ length & Sparsity & Base records & Added records \\
+\midrule
+Beauty & 22,363 & 12,101 & 194,687 & 8.71 & 99.9281\% & 34,464 & 22,363 \\
+Toys   & 19,412 & 11,924 & 167,597 & 8.63 & 99.9276\% & 31,336 & 19,412 \\
+Sports & 35,598 & 18,357 & 296,337 & 8.32 & 99.9547\% & 53,955 & 35,572 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\input{sections/table_overall}
+
+A candidate cannot be materialized before schema validation: its declarative recipe must first pass the schema check.
+Here $d_t^{(k)}$ is a schema, execution, or infrastructure diagnostic, $\tau_t^{(k)}$ is a provenance trace, and $\mathbf{y}_t^{(k)}$ is an aggregate validation outcome.
+These channels are kept distinct throughout evaluation, preventing any one from being substituted for another.
+
+
+Let $\mathcal{H}^{+}_t$ denote the complete trials and let $\mathcal{H}^{-}_t$ be the invalid or incomplete attempts.
+A complete trial passes both validators and finishes training and validation.
+After each trial, its completion status determines the archive update:
+\begin{equation}
+\begin{aligned}
+ \mathcal{H}^{+}_{t+1}
+ &=\mathcal{H}^{+}_{t}\cup
+ \{(\pi_t^{(k)},\mathbf{y}_t^{(k)},\tau_t^{(k)}):
+       \operatorname{complete}_t^{(k)}=1\},\\
+ \mathcal{H}^{-}_{t+1}
+ &=\mathcal{H}^{-}_{t}\cup
+ \{(\pi_t^{(k)},d_t^{(k)}):
+       \operatorname{complete}_t^{(k)}=0,\ d_t^{(k)}\neq\varnothing\}.
+\end{aligned}
+\label{eq:archive_rule}
+\end{equation}
+$\mathcal{H}^{+}_t$ is the only archive that contributes observations of $J_{\delta}$.
+The negative archive preserves actionable failure information without treating an invalid recipe as a low-scoring data point.
+The next planner call can retain an evaluated policy, explore another contextual partition, or repair a diagnosed interface mismatch, while leaving the execution semantics unchanged.
+
+\subsection{Policy Revision}
+
+The complete procedure is therefore a typed search-and-evaluation loop rather than an isolated routing rule. The framework's generality depends on this separation of search state from domain-specific execution.
+$P_{\theta}$ and $U$ operate on the abstract context and archive, while $\mathcal{I}_{\delta}$ supplies the domain-specific meaning of each feature, method, record, and outcome.
+A new dataset, downstream learner, or data-construction capability changes the adapter and objective, while the search state, policy language, and feedback loop remain defined.
+The same interface accommodates changes in the domain, method catalog, and downstream model through the corresponding adapter and validation objective.
+
+This ordering yields the experimental progression used in Section~\ref{sec:experiments}: compare complete policies first, intervene on routing and feedback components second, and inspect archive dynamics last.
+

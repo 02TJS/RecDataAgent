@@ -1,0 +1,35 @@
+\section{Introduction}
+\label{sec:introduction}
+
+% P1 follows the TaylorMix task setup: capability, heterogeneity, the need to
+% test utility, and the linked decisions made under a fixed budget.
+Recommendation LLMs learn preferences from language-formatted records \citep{geng2022p5,bao2023tallrec}, and data augmentation expands this supervision by constructing new records from logged behavior \citep{lee2025genpas,wang2025llmser}. However, users differ in the behavioral and semantic patterns expressed by their histories. These differences require the process to analyze multiple train-visible characteristics rather than apply one construction uniformly. These characteristics reveal meaningful differences among users; an augmentation procedure must additionally specify how it responds to them. User-conditioned augmentation therefore requires a complete budgeted policy that selects users from this analysis and assigns an augmentation method to each selected user.
+
+% P2 follows the TaylorMix review and natural-pipeline paragraph: useful
+% mechanisms exist, but their direct composition leaves the full policy manual.
+Existing approaches provide useful mechanisms for record construction and policy adaptation. CL4SRec~\citep{xie2022cl4rec} and CoSeRec~\citep{liu2021coserec} transform interaction histories, while GenPAS~\citep{lee2025genpas}, verbalization-based augmentation~\citep{shi2026verbalization}, and Llama4Rec~\citep{luo2024llama4rec} construct language-oriented recommendation records. L2Aug~\citep{wang2022l2aug} and AsarRec~\citep{zhang2026asarrec} further condition augmentation on user sequences or recommendation objectives. Automated policy search through AutoAugment~\citep{cubuk2019autoaugment}, Population Based Augmentation~\citep{ho2019pba}, and RandAugment~\citep{cubuk2020randaugment}, together with exposure optimization in DoReMi~\citep{xie2023doremi}, suggests a natural pipeline: derive a user-specific plan from train-visible features and materialize it under a shared budget. When assembled into one user-conditioned recommendation pipeline, however, these mechanisms do not by themselves produce a complete policy that maps multidimensional user context to heterogeneous method assignments under a shared budget.
+
+\newpage
+\begin{wrapfigure}[15]{r}{0.33\textwidth}
+\vspace{-0.5\intextsep}
+\centering
+\includegraphics[width=\linewidth]{figures/intro_motivation.pdf}
+\caption{User-conditioned views under a shared augmentation budget. A global prefix view can miss a recent interest shift, whereas routing by train-visible history retains the recent signal for the same user.}
+\label{fig:intro-motivation}
+\end{wrapfigure}
+
+% P3 follows the TaylorMix coupling argument sentence by sentence.
+The central challenge is that existing approaches cannot represent arbitrary user-conditioned augmentation constructions within a unified structured policy. Multidimensional user characteristics can be combined into different conditions for selecting users. Each condition can be paired with different augmentation methods, producing many possible constructions under the same budget. More importantly, constructions that appear equally reasonable from user characteristics can affect the target recommender differently, so recommendation results are needed to determine which construction is effective. A recommendation result can guide subsequent construction only when it remains linked to the complete policy that produced it. Without this link, however, the result measures the final corpus but does not show how its user analysis and augmentation choices should be reconsidered. Therefore, a unified structured policy is needed both to represent arbitrary constructions and to connect each construction with the recommendation result used to judge it.
+
+% P4 follows the two-sentence TaylorMix joint-formulation paragraph.
+These requirements motivate a unified formulation whose object is a complete user-conditioned augmentation policy. Such a policy maps multidimensional user analysis to decisions about whom to augment and which method to apply, and uses recommendation results to revise both the analysis and the augmentation assignments under a fixed budget.
+
+% P5 follows the TaylorMix operationalization paragraph and leads directly to
+% the contribution list.
+\method{} addresses this challenge by organizing user analysis and augmentation execution through the same complete structured policy. At each iteration, it uses a language-model controller to select and invoke feature-analysis tools over train-visible user context. The analytical basis summarizes multidimensional user characteristics and supports executable user selection; the augmentation configuration assigns methods to selected users and supports execution under the construction budget. The two components use different executable representations, but both remain parts of the same complete policy. Validation recommendation outcomes provide the feedback used to revise both components and select the final policy. Our contributions are as follows:
+\begin{itemize}[leftmargin=*]
+    \item We identify the lack of a unified structured policy in user-conditioned augmentation and formulate a complete policy that maps multidimensional analysis to user selection and method assignment while linking each policy to its recommendation outcome for feedback-driven revision.
+    \item We develop a language-model controller with feature-analysis tools that converts multidimensional user context into executable user-selection conditions and budgeted method assignments.
+    \item We develop feedback-conditioned revision that links recommendation outcomes to their policies, enabling joint updates to the analytical basis and augmentation configuration.
+    \item Experiments across three Amazon domains show that validation-selected \method{} policies improve recommendation performance over the evaluated augmentation baselines; routing controls and a matched first-round feedback ablation assess the contributions of contextual allocation and validation feedback.
+\end{itemize}

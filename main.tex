@@ -1,0 +1,103 @@
+\documentclass{article}
+\usepackage{iclr2027_conference,times}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\usepackage{graphicx}
+\usepackage{wrapfig}
+\usepackage{flafter}
+\usepackage{afterpage}
+\usepackage{float}
+\usepackage{placeins}
+\usepackage{caption}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{fancyvrb}
+\usepackage{needspace}
+\usepackage[table]{xcolor}
+\definecolor{methodblue}{RGB}{229,240,250}
+\definecolor{promptblue}{RGB}{57,96,132}
+\definecolor{promptbluebg}{RGB}{244,248,252}
+\definecolor{promptline}{RGB}{184,202,219}
+\DefineVerbatimEnvironment{promptblock}{Verbatim}{
+  fontsize=\scriptsize,
+  baselinestretch=0.92,
+  frame=single,
+  framerule=0.35pt,
+  rulecolor=\color{promptline},
+  framesep=4pt
+}
+\newcommand{\promptlabel}[1]{%
+  \Needspace{5\baselineskip}
+  \par\medskip\noindent
+  \colorbox{promptblue}{\textcolor{white}{\strut\footnotesize\bfseries #1}}%
+  \par\smallskip}
+\input{macros}
+
+% ---------------------------------------------------------------------------
+% Layout tuning only. No experimental content, table cell, caption fact or
+% numeric value is affected by the settings below.
+% ---------------------------------------------------------------------------
+
+% Let LaTeX move and split around wide tables instead of stranding them, while
+% keeping a table on the same page as the text that first mentions it whenever
+% the page can still hold it.
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{4}
+\renewcommand{\topfraction}{0.92}
+\renewcommand{\bottomfraction}{0.55}
+\renewcommand{\textfraction}{0.08}
+\renewcommand{\floatpagefraction}{0.80}
+\setlength{\floatsep}{6pt plus 2pt minus 2pt}
+\setlength{\textfloatsep}{8pt plus 2pt minus 3pt}
+\setlength{\intextsep}{7pt plus 2pt minus 2pt}
+\setlength{\dblfloatsep}{6pt plus 2pt minus 2pt}
+\setlength{\dbltextfloatsep}{8pt plus 2pt minus 3pt}
+\setlength{\abovecaptionskip}{4pt plus 1pt minus 1pt}
+\setlength{\belowcaptionskip}{1pt}
+
+% Absorb the residual vertical slack on each page so that the text block keeps a
+% consistent baseline and the page tail does not open into visible whitespace.
+\flushbottom
+\setlength{\parskip}{0.35pc}
+\widowpenalty=1000
+\clubpenalty=1000
+\displaywidowpenalty=1000
+\brokenpenalty=1000
+\emergencystretch=1.5em
+
+% Keep figure and table captions visually consistent across the paper.
+\captionsetup{
+  font=small,
+  labelfont=normalfont,
+  justification=raggedright,
+  singlelinecheck=false,
+  skip=4pt
+}
+
+\title{RecDataAgent: User-Conditioned Data\\Augmentation for LLM-based Recommendation}
+\author{Anonymous authors}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+Recommendation LLMs use records that translate user histories into preference supervision. Existing augmentation methods provide useful record constructors but do not determine which users should receive each constructor, how their exposure should be allocated in one corpus, or how recommendation outcomes should revise these coupled choices. We introduce \method{}, an executable framework for contextual data-policy optimization. A language-model controller constructs a complete user-conditioned augmentation policy from train-visible behavioral and item context, and typed adapters validate, materialize, and trace it. Validation outcomes update an evidence archive for revision and policy selection; test evaluation reports the performance of the fixed policies. On Amazon Beauty, Toys, and Sports with Qwen3-4B, the validation-selected policies outperform the strongest baseline method under the matched local protocol on all twelve domain--metric comparisons formed by Recall and NDCG at 10 and 20. Matched routing controls assess contextual allocation, and a matched first-round ablation measures the contribution of validation feedback. Across three feedback-conditioned rounds per domain, the archive connects policy changes to their recommendation outcomes. Together, these experiments demonstrate an effective approach to constructing and revising complete user-conditioned augmentation policies.
+\end{abstract}
+\input{sections/introduction}
+\input{sections/related_work}
+\input{sections/method}
+\input{sections/experiments}
+\input{sections/conclusion}
+\FloatBarrier
+\section*{AI Use Statement}
+Generative AI assisted with manuscript writing and LaTeX formatting. The authors reviewed the manuscript and remain responsible for its contents.
+\bibliographystyle{iclr2027_conference}
+\bibliography{references}
+\appendix
+\input{sections/appendix_experiments}
+\end{document}
